@@ -67,6 +67,7 @@ import org.gradle.internal.scripts.ScriptExecutionListener
 import org.gradle.util.Path
 import java.io.File
 import java.util.EnumSet
+import kotlin.reflect.KProperty
 
 
 internal
@@ -77,7 +78,8 @@ class ConfigurationCacheFingerprintWriter(
     private val fileCollectionFactory: FileCollectionFactory,
     private val directoryFileTreeFactory: DirectoryFileTreeFactory,
     private val taskExecutionTracker: TaskExecutionTracker,
-) : ValueSourceProviderFactory.Listener,
+) : ValueSourceProviderFactory.ValueListener,
+    ValueSourceProviderFactory.ComputationListener,
     WorkInputListener,
     ScriptExecutionListener,
     UndeclaredBuildInputListener,
@@ -133,6 +135,9 @@ class ConfigurationCacheFingerprintWriter(
     private
     var closestChangingValue: ConfigurationCacheFingerprint.ChangingDependencyResolutionValue? = null
 
+    private
+    var inputTrackingDisabledForThread by ThreadLocal.withInitial { false }
+
     init {
         val initScripts = host.allInitScripts
         buildScopedSink.initScripts(initScripts)
@@ -183,21 +188,30 @@ class ConfigurationCacheFingerprintWriter(
     }
 
     override fun fileObserved(file: File) {
+        if (inputTrackingDisabledForThread) {
+            return
+        }
         captureFile(file)
     }
 
     override fun systemPropertyRead(key: String, value: Any?, consumer: String?) {
+        if (inputTrackingDisabledForThread) {
+            return
+        }
         sink().systemPropertyRead(key, value)
         reportUniqueSystemPropertyInput(key, consumer)
     }
 
     override fun envVariableRead(key: String, value: String?, consumer: String?) {
+        if (inputTrackingDisabledForThread) {
+            return
+        }
         sink().envVariableRead(key, value)
         reportUniqueEnvironmentVariableInput(key, consumer)
     }
 
     override fun fileOpened(file: File, consumer: String?) {
-        if (taskExecutionTracker.currentTask.isPresent) {
+        if (inputTrackingDisabledForThread || taskExecutionTracker.currentTask.isPresent) {
             // Ignore files that are read as part of the task actions. These should really be task
             // inputs. Otherwise, we risk fingerprinting temporary files that will be gone at the
             // end of the build.
@@ -208,19 +222,36 @@ class ConfigurationCacheFingerprintWriter(
     }
 
     override fun fileCollectionObserved(fileCollection: FileCollection, consumer: String) {
+        if (inputTrackingDisabledForThread) {
+            return
+        }
         captureWorkInputs(consumer) { it(fileCollection as FileCollectionInternal) }
     }
 
     override fun systemPropertiesPrefixedBy(prefix: String, snapshot: Map<String, String?>) {
+        if (inputTrackingDisabledForThread) {
+            return
+        }
         buildScopedSink.write(ConfigurationCacheFingerprint.SystemPropertiesPrefixedBy(prefix, snapshot))
     }
 
     override fun envVariablesPrefixedBy(prefix: String, snapshot: Map<String, String?>) {
+        if (inputTrackingDisabledForThread) {
+            return
+        }
         buildScopedSink.write(ConfigurationCacheFingerprint.EnvironmentVariablesPrefixedBy(prefix, snapshot))
     }
 
+    override fun beforeValueObtained() {
+        inputTrackingDisabledForThread = true
+    }
+
+    override fun afterValueObtained() {
+        inputTrackingDisabledForThread = false
+    }
+
     override fun <T : Any, P : ValueSourceParameters> valueObtained(
-        obtainedValue: ValueSourceProviderFactory.Listener.ObtainedValue<T, P>,
+        obtainedValue: ValueSourceProviderFactory.ValueListener.ObtainedValue<T, P>,
         source: org.gradle.api.provider.ValueSource<T, P>
     ) {
         when (val parameters = obtainedValue.valueSourceParameters) {
@@ -546,3 +577,11 @@ fun jvmFingerprint() = String.format(
     System.getProperty("java.vm.vendor"),
     System.getProperty("java.vm.version")
 )
+
+
+private
+operator fun <T> ThreadLocal<T>.getValue(thisRef: Any?, property: KProperty<*>) = get()
+
+
+private
+operator fun <T> ThreadLocal<T>.setValue(thisRef: Any?, property: KProperty<*>, value: T) = set(value)

@@ -96,4 +96,4 @@ sealed class ConfigurationCacheFingerprint {
 
 
 internal
-typealias ObtainedValue = ValueSourceProviderFactory.Listener.ObtainedValue<Any, ValueSourceParameters>
+typealias ObtainedValue = ValueSourceProviderFactory.ValueListener.ObtainedValue<Any, ValueSourceParameters>
