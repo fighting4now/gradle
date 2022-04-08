@@ -26,7 +26,8 @@ We would like to thank the following community members for their contributions t
 [David Op de Beeck](https://github.com/DavidOpDeBeeck),
 [Peter Gafert](https://github.com/codecholeric),
 [Alex Landau](https://github.com/AlexLandau),
-[Tyler Burke](https://github.com/T-A-B)
+[Tyler Burke](https://github.com/T-A-B),
+[Lajos Veres](https://github.com/vlajos)
 
 <!--
 Include only their name, impactful features should be called out separately below.
