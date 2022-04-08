@@ -81,6 +81,14 @@ trait VersionCatalogErrorMessages {
         buildMessage(ParseError, VersionCatalogProblemId.TOML_SYNTAX_ERROR, spec)
     }
 
+    String noImportFiles(@DelegatesTo(value=NoImportFiles, strategy = Closure.DELEGATE_FIRST) Closure<?> spec) {
+        buildMessage(NoImportFiles, VersionCatalogProblemId.NO_IMPORT_FILES, spec)
+    }
+
+    String tooManyImportFiles(@DelegatesTo(value=NoImportFiles, strategy = Closure.DELEGATE_FIRST) Closure<?> spec) {
+        buildMessage(TooManyImportFiles, VersionCatalogProblemId.TOO_MANY_IMPORT_FILES, spec)
+    }
+
     private static <T extends InCatalog<T>> String buildMessage(Class<T> clazz, VersionCatalogProblemId id, Closure<?> spec) {
         def desc = clazz.newInstance()
         desc.section = id.name().toLowerCase()
@@ -481,6 +489,42 @@ ${solution}
     Reason: File '${missingFile.absolutePath}' doesn't exist.
 
     Possible solution: Make sure that the catalog file '${missingFile.name}' exists before importing it.
+
+    ${documentation}"""
+        }
+    }
+
+    static class NoImportFiles extends InCatalog<NoImportFiles> {
+        NoImportFiles() {
+            intro = """Invalid catalog definition:
+"""
+        }
+
+        @Override
+        String build() {
+            """${intro}  - Problem: In version catalog ${catalog}, no files are resolved to be imported.
+
+    Reason: The imported dependency doesn't resolve into any file.
+
+    Possible solution: Check if the imported resource exists.
+
+    ${documentation}"""
+        }
+    }
+
+    static class TooManyImportFiles extends InCatalog<TooManyImportFiles> {
+        TooManyImportFiles() {
+            intro = """Invalid catalog definition:
+"""
+        }
+
+        @Override
+        String build() {
+            """${intro}  - Problem: In version catalog ${catalog}, importing multiple files are not supported.
+
+    Reason: The import consists of multiple files.
+
+    Possible solution: Only import a single file.
 
     ${documentation}"""
         }

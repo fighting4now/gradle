@@ -763,7 +763,7 @@ dependencyResolutionManagement {
         fails 'help'
 
         then:
-        verifyContains(failure.error, parseError {
+        verifyContains(failure.error, tooManyImportFiles {
             inCatalog("testLibs")
         })
     }
@@ -785,7 +785,7 @@ dependencyResolutionManagement {
         fails 'help'
 
         then:
-        verifyContains(failure.error, parseError {
+        verifyContains(failure.error, noImportFiles {
             inCatalog("testLibs")
         })
     }
