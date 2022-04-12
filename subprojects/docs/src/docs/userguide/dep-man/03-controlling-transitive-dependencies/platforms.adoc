@@ -328,6 +328,11 @@ include::sample[dir="snippets/dependencyManagement/catalogs-toml/groovy/buildSrc
 include::sample[dir="snippets/dependencyManagement/catalogs-toml/kotlin/buildSrc",files="settings.gradle.kts[tags=import_main_catalog]"]
 ====
 
+[WARNING]
+====
+A catalog can only import a _single_ file.
+====
+
 This technique can therefore be used to declare multiple catalogs from different files:
 
 .Declaring additional catalogs

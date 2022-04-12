@@ -247,9 +247,17 @@ public class DefaultVersionCatalogBuilder implements VersionCatalogBuilderIntern
 
     @Override
     public void from(Object dependencyNotation) {
-        importedCatalog = new Import(dependencyNotation);
+        if (importedCatalog == null) {
+            importedCatalog = new Import(dependencyNotation);
+        } else {
+            throwVersionCatalogProblem(VersionCatalogProblemId.MULTIPLE_IMPORTS_CALLED, spec ->
+                spec.withShortDescription("You can only call the 'from' method a single time")
+                    .happensBecause("The method was called more than once")
+                    .addSolution("Remove further usages of the method call")
+                    .documentedAt("platforms", "sec:sharing-catalogs")
+            );
+        }
     }
-
     private void importCatalogFromFile(File modelFile) {
         if (!FileUtils.hasExtensionIgnoresCase(modelFile.getName(), "toml")) {
             throwVersionCatalogProblem(VersionCatalogProblemId.UNSUPPORTED_FILE_FORMAT, spec ->
