@@ -849,15 +849,16 @@ class DefaultExecutionPlanTest extends AbstractExecutionPlanSpec {
         Task a = task("a")
         Task b = task("b", dependsOn: [a])
         Task c = task("c", dependsOn: [b])
-        addToGraphAndPopulate([b])
-        executes(a, b)
+        Task d = task("d", dependsOn: [b])
+        addToGraphAndPopulate([c])
+        executes(a, b, c)
 
         when:
         executionPlan = newExecutionPlan()
-        addToGraphAndPopulate([c])
+        addToGraphAndPopulate([d])
 
         then:
-        executes(c)
+        executes(d)
     }
 
     def "does not build graph for or execute tasks that failed in a previous plan"() {

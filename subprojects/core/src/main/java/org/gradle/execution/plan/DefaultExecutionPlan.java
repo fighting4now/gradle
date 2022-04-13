@@ -20,7 +20,6 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Iterators;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.gradle.api.Action;
@@ -67,6 +66,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.Lists.newLinkedList;
@@ -81,7 +81,6 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
 
     private final Set<Node> entryNodes = new LinkedHashSet<>();
     private final NodeMapping nodeMapping = new NodeMapping();
-    private final List<Node> executionQueue = new LinkedList<>();
     private final List<Throwable> failures = new ArrayList<>();
     private final String displayName;
     private final TaskNodeFactory taskNodeFactory;
@@ -97,7 +96,6 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
     private boolean continueOnFailure;
 
     private final Set<Node> runningNodes = newIdentityHashSet();
-    private final List<Node> priorityNodes = new LinkedList<>();
     private final Set<Node> filteredNodes = newIdentityHashSet();
     private final Set<Node> producedButNotYetConsumed = newIdentityHashSet();
     private final Map<Pair<Node, Node>, Boolean> reachableCache = new HashMap<>();
@@ -105,14 +103,11 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
     private final OrdinalNodeAccess ordinalNodeAccess = new OrdinalNodeAccess();
     private Consumer<LocalTaskNode> completionHandler = localTaskNode -> {
     };
+    private final ExecutionQueue executionQueue = new ExecutionQueue();
 
     // When true, there may be nodes that are "ready", which means their dependencies have completed and the action is ready to execute
     // When false, there are definitely no nodes that are "ready"
     private boolean maybeNodesReady;
-
-    // When true, there may be nodes that are both ready and "selectable", which means their project and resources are able to be locked
-    // When false, there are definitely no nodes that are "selectable"
-    private boolean maybeNodesSelectable;
 
     private boolean buildCancelled;
 
@@ -368,11 +363,8 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
 
     @Override
     public WorkSource<Node> finalizePlan() {
-        for (Node node : executionQueue) {
-            node.updateAllDependenciesComplete();
-        }
-
-        maybeNodesSelectable = true;
+        executionQueue.visitQueuedNodes(Node::updateAllDependenciesComplete);
+        executionQueue.restart();
         maybeNodesReady = true;
 
         // For now
@@ -381,7 +373,7 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
 
     private void resourceUnlocked(ResourceLock resourceLock) {
         if (!(resourceLock instanceof WorkerLeaseRegistry.WorkerLease) && maybeNodesReady) {
-            maybeNodesSelectable = true;
+            executionQueue.restart();
         }
     }
 
@@ -574,7 +566,7 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
         lockCoordinator.assertHasStateLock();
         if (executionQueue.isEmpty()) {
             return State.NoMoreWorkToStart;
-        } else if (maybeNodesSelectable) {
+        } else if (executionQueue.maybeNodesSelectable()) {
             return State.MaybeWorkReadyToStart;
         } else {
             return State.NoWorkReadyToStart;
@@ -589,13 +581,13 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
         boolean cannotMakeProgress = state == State.NoWorkReadyToStart && runningNodes.isEmpty();
         if (cannotMakeProgress) {
             List<String> nodes = new ArrayList<>(executionQueue.size());
-            for (Node node : executionQueue) {
+            executionQueue.visitQueuedNodes(node -> {
                 if (!node.allDependenciesComplete()) {
                     nodes.add(node + " (dependencies not complete)");
                 } else {
                     nodes.add(node.toString());
                 }
-            }
+            });
             return new Diagnostics(false, nodes);
         } else {
             return new Diagnostics(true, Collections.emptyList());
@@ -608,26 +600,27 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
         if (executionQueue.isEmpty()) {
             return Selection.noMoreWorkToStart();
         }
-        if (!maybeNodesSelectable) {
+        if (!executionQueue.maybeNodesSelectable()) {
             return Selection.noWorkReadyToStart();
         }
 
         List<ResourceLock> resources = new ArrayList<>();
-        Iterator<Node> iterator = Iterators.concat(priorityNodes.iterator(), executionQueue.iterator());
         boolean foundReadyNode = false;
-        boolean skippedNode = false;
-        while (iterator.hasNext()) {
-            Node node = iterator.next();
+        while (executionQueue.hasNext()) {
+            Node node = executionQueue.next();
             if (node.allDependenciesComplete()) {
                 if (!node.allDependenciesSuccessful()) {
-                    // Cannot execute this node due to failed dependencies - skip it
+                    // Cannot execute this node so skip it
+                    // - some dependencies of the node failed
+                    // - it is a finalizer for nodes that are all complete but did not execute
+                    executionQueue.remove();
                     if (node.shouldCancelExecutionDueToDependencies()) {
                         node.cancelExecution(this::recordNodeCompleted);
                     } else {
                         node.markFailedDueToDependencies(this::recordNodeCompleted);
                     }
-                    iterator.remove();
-                    skippedNode = true;
+                    // Skipped some nodes, which may invalidate some earlier nodes (for example a shared dependency of multiple finalizers when all finalizers are skipped), so start again
+                    executionQueue.restart();
                     continue;
                 }
 
@@ -653,14 +646,13 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
                 }
 
                 if (attemptToStart(node, resources)) {
-                    iterator.remove();
+                    executionQueue.remove();
                     return Selection.of(node);
                 }
             } else if (node.isComplete()) {
                 // node is complete
                 // - it is a priority node that has already executed
-                // - it is a finalizer for nodes that are all complete but did not execute
-                iterator.remove();
+                executionQueue.remove();
             }
             // Else, node is not yet complete
             // - its dependencies are not yet complete
@@ -670,18 +662,13 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
 
         LOGGER.debug("No node could be selected, nodes ready: {}", foundReadyNode);
         maybeNodesReady = foundReadyNode;
-        maybeNodesSelectable = false;
         if (executionQueue.isEmpty()) {
             return Selection.noMoreWorkToStart();
-        } else if (skippedNode) {
-            // Skipped some nodes, which may invalidate some earlier nodes (for example a shared dependency of multiple finalizers when all finalizers are skipped), so start again
-            maybeNodesSelectable = true;
-            return selectNext();
         } else {
             // Some tasks are yet to start
             // - they are ready to execute but cannot acquire the resources they need to start
             // - they are waiting for their dependencies to complete
-            // - they are waiting for some external event
+            // - they are waiting for some external event (eg a task in another build to complete)
             return Selection.noWorkReadyToStart();
         }
     }
@@ -912,7 +899,7 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
         }
         try {
             if (maybeNodesReady) {
-                maybeNodesSelectable = true;
+                executionQueue.restart();
             }
             runningNodes.remove(node);
             node.finishExecution(this::recordNodeCompleted);
@@ -932,9 +919,9 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
     private void maybeNodeReady(Node node) {
         if (node.allDependenciesComplete()) {
             maybeNodesReady = true;
-            maybeNodesSelectable = true;
+            executionQueue.restart();
             if (node.isPriority()) {
-                priorityNodes.add(node);
+                executionQueue.isPriorityNode(node);
             }
         }
     }
@@ -1006,21 +993,18 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
     }
 
     private boolean abortExecution(boolean abortAll) {
-        boolean aborted = false;
-        Iterator<Node> iterator = executionQueue.iterator();
-        while (iterator.hasNext()) {
-            Node node = iterator.next();
-
+        boolean aborted = executionQueue.removeQueuedNodesWhere(node -> {
             // Allow currently executing and enforced tasks to complete, but skip everything else.
             // If abortAll is set, also stop everything.
             if (abortAll || node.isCanCancel()) {
                 node.cancelExecution(this::recordNodeCompleted);
-                iterator.remove();
-                aborted = true;
+                return true;
+            } else {
+                return false;
             }
-        }
+        });
         if (aborted) {
-            maybeNodesSelectable = true;
+            executionQueue.restart();
         }
         return aborted;
     }
@@ -1041,6 +1025,91 @@ public class DefaultExecutionPlan implements ExecutionPlan, WorkSource<Node> {
     @Override
     public int size() {
         return nodeMapping.getNumberOfPublicNodes();
+    }
+
+    private static class ExecutionQueue {
+        private final List<Node> executionQueue = new ArrayList<>();
+        private final List<Node> priorityNodes = new ArrayList<>();
+        private int currentPos = 0;
+
+        public void addAll(Collection<Node> nodes) {
+            executionQueue.addAll(nodes);
+        }
+
+        public void isPriorityNode(Node node) {
+            priorityNodes.add(node);
+        }
+
+        public boolean isEmpty() {
+            return executionQueue.isEmpty();
+        }
+
+        public boolean maybeNodesSelectable() {
+            return currentPos < priorityNodes.size() + executionQueue.size();
+        }
+
+        public int size() {
+            return executionQueue.size();
+        }
+
+        public void restart() {
+            currentPos = 0;
+        }
+
+        public boolean hasNext() {
+            return currentPos < priorityNodes.size() + executionQueue.size();
+        }
+
+        public Node next() {
+            Node node;
+            if (currentPos < priorityNodes.size()) {
+                node = priorityNodes.get(currentPos);
+            } else {
+                node = executionQueue.get(currentPos - priorityNodes.size());
+            }
+            currentPos++;
+            return node;
+        }
+
+        /**
+         * Removes the current node.
+         */
+        public void remove() {
+            currentPos--;
+            if (currentPos < priorityNodes.size()) {
+                priorityNodes.remove(currentPos);
+            } else {
+                executionQueue.remove(currentPos - priorityNodes.size());
+            }
+        }
+
+        public void visitQueuedNodes(Consumer<Node> visitor) {
+            for (Node node : executionQueue) {
+                visitor.accept(node);
+            }
+        }
+
+        public boolean removeQueuedNodesWhere(Function<Node, Boolean> predicate) {
+            boolean removed = false;
+            int i = 0;
+            while (i < executionQueue.size()) {
+                Node node = executionQueue.get(i);
+                if (predicate.apply(node)) {
+                    removed = true;
+                    executionQueue.remove(i);
+                    priorityNodes.remove(node);
+                } else {
+                    i++;
+                }
+            }
+            return removed;
+        }
+
+        public void clear() {
+            executionQueue.clear();
+            priorityNodes.clear();
+            currentPos = 0;
+        }
     }
 
     private static class GraphEdge {

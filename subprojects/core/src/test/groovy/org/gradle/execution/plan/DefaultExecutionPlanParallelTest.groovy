@@ -86,7 +86,7 @@ class DefaultExecutionPlanParallelTest extends AbstractExecutionPlanSpec {
         executionPlan.tasks as List == [dep, finalized, finalizerDep1, finalizerDep2, finalizer, task]
         assertSingleTaskReady(dep)
         assertSingleTaskReady(finalized)
-        assertTasksReady(finalizerDep1, finalizerDep2, task)
+        assertTasksReady(finalizerDep1, finalizerDep2, task, false)
         assertLastTaskReady(finalizer)
         assertAllWorkComplete()
     }
@@ -151,7 +151,7 @@ class DefaultExecutionPlanParallelTest extends AbstractExecutionPlanSpec {
         then:
         executionPlan.tasks as List == [finalized, broken, finalizerDep, finalizer, task]
         assertSingleTaskReady(finalized)
-        assertTasksReady(broken, task)
+        assertTasksReady(broken, task, false)
         assertAllWorkComplete(true)
 
         where:
@@ -1165,12 +1165,12 @@ class DefaultExecutionPlanParallelTest extends AbstractExecutionPlanSpec {
         def otherTaskWithDependencyNode = selectNextTaskNode()
         then:
         otherTaskWithDependencyNode.task == otherTaskWithDependency
-        assertNoWorkReadyToStartAfterSelect()
+        assertNoWorkReadyToStart()
 
         when:
         finishedExecuting(otherTaskWithDependencyNode)
         then:
-        assertNoWorkReadyToStart()
+        assertNoWorkReadyToStartAfterSelect()
 
         when:
         finishedExecuting(finalizedNode)
@@ -1450,20 +1450,24 @@ class DefaultExecutionPlanParallelTest extends AbstractExecutionPlanSpec {
         finishedExecuting(node1)
     }
 
-    void assertTasksReady(Task task1, Task task2, Task task3) {
+    void assertTasksReady(Task task1, Task task2, Task task3, boolean needToSelect = true) {
         def node1 = selectNextTaskNode()
         assert node1.task == task1
         def node2 = selectNextTaskNode()
         assert node2.task == task2
         def node3 = selectNextTaskNode()
         assert node3.task == task3
-        assertNoWorkReadyToStartAfterSelect()
+        if (needToSelect) {
+            assertNoWorkReadyToStartAfterSelect()
+        } else {
+            assertNoWorkReadyToStart()
+        }
         finishedExecuting(node3)
         finishedExecuting(node2)
         finishedExecuting(node1)
     }
 
-    void assertTasksReady(Task task1, Task task2, Task task3, Task task4) {
+    void assertTasksReady(Task task1, Task task2, Task task3, Task task4, boolean needToSelect = true) {
         def node1 = selectNextTaskNode()
         assert node1.task == task1
         def node2 = selectNextTaskNode()
@@ -1472,7 +1476,11 @@ class DefaultExecutionPlanParallelTest extends AbstractExecutionPlanSpec {
         assert node3.task == task3
         def node4 = selectNextTaskNode()
         assert node4.task == task4
-        assertNoWorkReadyToStartAfterSelect()
+        if (needToSelect) {
+            assertNoWorkReadyToStartAfterSelect()
+        } else {
+            assertNoWorkReadyToStart()
+        }
         finishedExecuting(node4)
         finishedExecuting(node3)
         finishedExecuting(node2)
