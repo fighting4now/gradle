@@ -34,7 +34,9 @@ public class    ProcessBootstrap {
      */
     public void run(String mainClassName, String[] args) {
         try {
+            // 启动gradle后台进程
             runNoExit(mainClassName, args);
+            // GradleWrapperMain进程退出
             System.exit(0);
         } catch (Throwable throwable) {
             throwable.printStackTrace();
@@ -42,6 +44,12 @@ public class    ProcessBootstrap {
         }
     }
 
+    /**
+     * 启动不退出 启动一个后台进程
+     * @param mainClassName
+     * @param args
+     * @throws Exception
+     */
     private void runNoExit(String mainClassName, String[] args) throws Exception {
         ClassPathRegistry classPathRegistry = new DefaultClassPathRegistry(new DefaultClassPathProvider(new DefaultModuleRegistry(CurrentGradleInstallation.get())));
         ClassLoaderFactory classLoaderFactory = new DefaultClassLoaderFactory();

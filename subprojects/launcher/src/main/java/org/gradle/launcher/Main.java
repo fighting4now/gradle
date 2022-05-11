@@ -24,6 +24,9 @@ import java.util.Arrays;
 
 /**
  * The main command-line entry-point for Gradle.
+ * lxy: Gradle主要命令行入口点
+ *
+ * $GRADLE_USER_HOME/lib/gradle-launcher-*.jar的源代码位置
  */
 public class Main extends EntryPoint {
     public static void main(String[] args) {

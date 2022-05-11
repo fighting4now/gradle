@@ -31,8 +31,11 @@ import java.util.SortedSet;
 
 import static org.apache.commons.io.filefilter.FileFilterUtils.directoryFileFilter;
 
+/**
+ * 指定版本缓存目录扫描  eg: .gradle/caches/5.6.4
+ */
 public class VersionSpecificCacheDirectoryScanner {
-
+    // eg:  ./gradle/caches
     private final File baseDir;
 
     public VersionSpecificCacheDirectoryScanner(File baseDir) {
@@ -47,17 +50,21 @@ public class VersionSpecificCacheDirectoryScanner {
         return new File(baseDir, gradleVersion.getVersion());
     }
 
-    public SortedSet<VersionSpecificCacheDirectory> getExistingDirectories() {
-        ImmutableSortedSet.Builder<VersionSpecificCacheDirectory> builder = ImmutableSortedSet.naturalOrder();
+    public SortedSet<org.gradle.cache.internal.VersionSpecificCacheDirectory> getExistingDirectories() {
+        ImmutableSortedSet.Builder<org.gradle.cache.internal.VersionSpecificCacheDirectory> builder = ImmutableSortedSet.naturalOrder();
         for (File subDir : listVersionSpecificCacheDirs()) {
             GradleVersion version = tryParseGradleVersion(subDir);
             if (version != null) {
-                builder.add(new VersionSpecificCacheDirectory(subDir, version));
+                builder.add(new org.gradle.cache.internal.VersionSpecificCacheDirectory(subDir, version));
             }
         }
         return builder.build();
     }
 
+    /**
+     * 找出版本指定缓存目录  eg: .gradle/caches/5.6.4
+     * @return
+     */
     private Collection<File> listVersionSpecificCacheDirs() {
         FileFilter combinedFilter = FileFilterUtils.and(directoryFileFilter(), new RegexFileFilter("^\\d.*"));
         File[] result = baseDir.listFiles(combinedFilter);

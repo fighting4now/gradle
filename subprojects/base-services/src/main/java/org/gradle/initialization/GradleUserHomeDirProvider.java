@@ -21,6 +21,7 @@ import java.io.File;
 public interface GradleUserHomeDirProvider {
     /**
      * Returns the user home directory for the current build.
+     * 返回当前构建的gradle的家目录
      */
     File getGradleUserHomeDirectory();
 }

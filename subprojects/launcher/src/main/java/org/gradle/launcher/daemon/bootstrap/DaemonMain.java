@@ -56,6 +56,9 @@ import java.util.List;
  *
  * If the daemon hits the specified idle timeout the process will exit with 0. If the daemon encounters an internal error or is explicitly stopped (which can be via receiving a stop command, or
  * unexpected client disconnection) the process will exit with 1.
+ *
+ * lxy: 后台进程的入口
+ *
  */
 public class DaemonMain extends EntryPoint {
     private static final Logger LOGGER = Logging.getLogger(DaemonMain.class);

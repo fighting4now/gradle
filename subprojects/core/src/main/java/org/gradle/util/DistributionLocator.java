@@ -20,6 +20,10 @@ import org.gradle.internal.UncheckedException;
 import java.net.URI;
 import java.net.URISyntaxException;
 
+/**
+ * 用于生成 wrapper/gradle-wrapper.properties中的属性distributionUrl的值
+ * eg: distributionUrl=https\://services.gradle.org/distributions/gradle-7.0-rc-2-bin.zip
+ */
 public class DistributionLocator {
     private static final String RELEASE_REPOSITORY = "https://services.gradle.org/distributions";
     private static final String SNAPSHOT_REPOSITORY = "https://services.gradle.org/distributions-snapshots";
@@ -43,6 +47,7 @@ public class DistributionLocator {
     private URI getDistribution(String repositoryUrl, GradleVersion version, String archiveName,
                                    String archiveClassifier) {
         try {
+            // https://services.gradle.org/distributions / gradle - 7.0-rc-2 - bin .zip
             return new URI(repositoryUrl + "/" + archiveName + "-" + version.getVersion() + "-" + archiveClassifier + ".zip");
         } catch (URISyntaxException e) {
             throw UncheckedException.throwAsUncheckedException(e);

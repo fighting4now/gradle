@@ -1,3 +1,13 @@
+pluginManagement {
+    includeBuild("build-logic-settings")
+    repositories {
+        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
+        maven { url = uri("https://repo.gradle.org/gradle/libs-releases") }
+        maven { url = uri("https://repo.gradle.org/gradle/enterprise-libs-release-candidates-local") }
+        gradlePluginPortal()
+    }
+}
+
 plugins {
     `kotlin-dsl`
 }

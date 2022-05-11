@@ -17,6 +17,9 @@ package org.gradle.launcher.daemon.bootstrap;
 
 import org.gradle.launcher.bootstrap.ProcessBootstrap;
 
+/**
+ * lxy: gradle后台进程启动
+ */
 public class GradleDaemon {
     public static void main(String[] args) {
         new ProcessBootstrap().run("org.gradle.launcher.daemon.bootstrap.DaemonMain", args);

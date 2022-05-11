@@ -53,12 +53,16 @@ import java.util.zip.ZipFile;
 import static org.apache.commons.io.filefilter.FileFilterUtils.directoryFileFilter;
 import static org.gradle.util.CollectionUtils.single;
 
-public class WrapperDistributionCleanupAction implements DirectoryCleanupAction {
+/**
+ * 删除包装器中下载的gradle   eg: .gradle/wrapper/dists/gradle-7.0-rc-2-bin
+ */
+public class WrapperDistributionCleanupAction implements org.gradle.cache.internal.DirectoryCleanupAction {
 
     @VisibleForTesting static final String WRAPPER_DISTRIBUTION_FILE_PATH = "wrapper/dists";
     private static final Logger LOGGER = LoggerFactory.getLogger(WrapperDistributionCleanupAction.class);
 
     private static final ImmutableMap<String, Pattern> JAR_FILE_PATTERNS_BY_PREFIX;
+    // eg: org/gradle/build-receipt.properties
     private static final String BUILD_RECEIPT_ZIP_ENTRY_PATH = StringUtils.removeStart(GradleVersion.RESOURCE_NAME, "/");
 
     static {
@@ -74,7 +78,7 @@ public class WrapperDistributionCleanupAction implements DirectoryCleanupAction 
         JAR_FILE_PATTERNS_BY_PREFIX = builder.build();
     }
 
-    private final File distsDir;
+    private final File distsDir;  // eg: .gradle/wrapper/dists
     private final UsedGradleVersions usedGradleVersions;
 
     public WrapperDistributionCleanupAction(File gradleUserHomeDirectory, UsedGradleVersions usedGradleVersions) {
@@ -88,8 +92,14 @@ public class WrapperDistributionCleanupAction implements DirectoryCleanupAction 
         return "Deleting unused Gradle distributions in " + distsDir;
     }
 
+    /**
+     * 要执行的方法
+     * @param progressMonitor
+     * @return
+     */
     @Override
     public boolean execute(@Nonnull CleanupProgressMonitor progressMonitor) {
+        // 返回前一天的时间戳
         long maximumTimestamp = Math.max(0, System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1));
         Set<GradleVersion> usedVersions = this.usedGradleVersions.getUsedGradleVersions();
         Multimap<GradleVersion, File> checksumDirsByVersion = determineChecksumDirsByVersion();
@@ -153,7 +163,9 @@ public class WrapperDistributionCleanupAction implements DirectoryCleanupAction 
     private Multimap<GradleVersion, File> determineChecksumDirsByVersion() {
         Multimap<GradleVersion, File> result = ArrayListMultimap.create();
         for (File dir : listDirs(distsDir)) {
+            // dir: wrapper/dists/gradle-5.6.4-bin
             for (File checksumDir : listDirs(dir)) {
+                // checksumDir: wrapper/dists/gradle-5.6.4-bin/bxirm19lnfz6nurbatndyydux
                 try {
                     GradleVersion gradleVersion = determineGradleVersionFromBuildReceipt(checksumDir);
                     result.put(gradleVersion, checksumDir);
@@ -166,16 +178,27 @@ public class WrapperDistributionCleanupAction implements DirectoryCleanupAction 
     }
 
     private GradleVersion determineGradleVersionFromBuildReceipt(File checksumDir) throws Exception {
+        // subDirs: wrapper/dists/gradle-5.6.4-bin/bxirm19lnfz6nurbatndyydux/...
+        //
         List<File> subDirs = listDirs(checksumDir);
+        // 判断目录下是否只有一个目录,如果不是就报错
         Preconditions.checkArgument(subDirs.size() == 1, "A Gradle distribution must contain exactly one subdirectory: %s", subDirs);
         return determineGradleVersionFromDistribution(single(subDirs));
     }
 
     @VisibleForTesting
     protected GradleVersion determineGradleVersionFromDistribution(File distributionHomeDir) throws Exception {
+        // distributionHomeDir: wrapper/dists/gradle-5.6.4-bin/bxirm19lnfz6nurbatndyydux/gradle-5.6.4
+
+
         List<File> checkedJarFiles = new ArrayList<File>();
         for (Map.Entry<String, Pattern> entry : JAR_FILE_PATTERNS_BY_PREFIX.entrySet()) {
             List<File> jarFiles = listFiles(new File(distributionHomeDir, "lib"), new RegexFileFilter(entry.getValue()));
+            //  gradle-base-services,
+            //  gradle-version-info,
+            //  gradle-core
+            // jarFiles: 例如:   .../gradle-base-services-5.6.4.jar    or    .../gradle-core-5.6.4.jar
+
             if (!jarFiles.isEmpty()) {
                 Preconditions.checkArgument(jarFiles.size() == 1, "A Gradle distribution must contain at most one %s-*.jar: %s", entry.getKey(), jarFiles);
                 File jarFile = single(jarFiles);
@@ -189,6 +212,12 @@ public class WrapperDistributionCleanupAction implements DirectoryCleanupAction 
         throw new IllegalArgumentException("No checked JAR file contained a build receipt: " + checkedJarFiles);
     }
 
+    /**
+     * 从指定的jar中读取gradle版本  eg: gradle-base-services-5.6.4.jar
+     * @param jarFile
+     * @return
+     * @throws Exception
+     */
     @Nullable
     private GradleVersion readGradleVersionFromJarFile(File jarFile) throws Exception {
         ZipFile zipFile = null;
@@ -202,6 +231,17 @@ public class WrapperDistributionCleanupAction implements DirectoryCleanupAction 
 
     @Nullable
     private GradleVersion readGradleVersionFromBuildReceipt(ZipFile zipFile) throws Exception {
+        // 读取指定的jar包中的文件org/gradle/build-receipt.properties
+
+        // eg: gradle-base-services-5.6.4.jar中的文件org/gradle/build-receipt.properties 内容如下:
+        // baseVersion=5.6.4
+        //buildTimestamp=20191101204200+0000
+        //buildTimestampIso=2019-11-01 20\:42\:00 UTC
+        //commitId=dd870424f9bd8e195d614dc14bb140f43c22da98
+        //isSnapshot=false
+        //versionNumber=5.6.4
+
+
         ZipEntry zipEntry = zipFile.getEntry(BUILD_RECEIPT_ZIP_ENTRY_PATH);
         if (zipEntry == null) {
             return null;
@@ -210,6 +250,9 @@ public class WrapperDistributionCleanupAction implements DirectoryCleanupAction 
         try {
             Properties properties = new Properties();
             properties.load(in);
+
+            // GradleVersion.VERSION_NUMBER_PROPERTY: versionNumber
+            // 获取版本号  versionNumber=5.6.4
             String versionString = properties.getProperty(GradleVersion.VERSION_NUMBER_PROPERTY);
             return GradleVersion.version(versionString);
         } finally {
@@ -226,6 +269,7 @@ public class WrapperDistributionCleanupAction implements DirectoryCleanupAction 
     }
 
     private List<File> listFiles(File baseDir, @Nullable FileFilter filter) {
+        // baseDir: wrapper/dists/gradle-5.6.4-bin/bxirm19lnfz6nurbatndyydux/gradle-5.6.4/lib
         File[] dirs = baseDir.listFiles(filter);
         return dirs == null ? Collections.<File>emptyList() : Arrays.asList(dirs);
     }

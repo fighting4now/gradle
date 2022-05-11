@@ -66,10 +66,15 @@ public class LayoutToPropertiesConverter {
         BuildLayoutParameters layoutParameters = new BuildLayoutParameters();
         layout.applyTo(layoutParameters);
         Map<String, String> properties = new HashMap<>();
+        // 将当前运行的gradle安装目录下的gradle.properties中的JVM系统属性添加到properties中
         configureFromHomeDir(layoutParameters.getGradleInstallationHomeDir(), properties);
+        // 当前项目根目录下的gradle.properties含有的JVM系统参数添加到properties中去
         configureFromBuildDir(layoutParameters.getSearchDir(), properties, buildArguments);
+        // 将gradle家目录下的gradle.properties中的JVM系统属性添加到properties中
         configureFromHomeDir(layout.getGradleUserHomeDir(), properties);
+        // 将JVM默认系统参数添加到properties中去properties中
         configureFromSystemPropertiesOfThisJvm(Cast.uncheckedNonnullCast(properties));
+        // 将命令行选项中的JVM参数添加到properties中去
         properties.putAll(initialProperties.getRequestedSystemProperties());
         return new Result(properties, initialProperties);
     }

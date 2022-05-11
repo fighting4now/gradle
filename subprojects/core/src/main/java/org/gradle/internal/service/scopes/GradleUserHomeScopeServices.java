@@ -105,6 +105,7 @@ public class GradleUserHomeScopeServices extends WorkerSharedUserHomeScopeServic
     public void configure(ServiceRegistration registration, GradleUserHomeDirProvider userHomeDirProvider) {
         File userHomeDir = userHomeDirProvider.getGradleUserHomeDirectory();
         registration.addProvider(new CacheRepositoryServices(userHomeDir, null));
+        // lxy: 注册gradle用户家目录清除服务
         registration.addProvider(new GradleUserHomeCleanupServices());
         registration.add(ClasspathWalker.class);
         registration.add(ClasspathBuilder.class);

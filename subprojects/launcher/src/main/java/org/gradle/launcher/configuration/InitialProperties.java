@@ -25,6 +25,7 @@ import java.util.Map;
 public interface InitialProperties {
     /**
      * Returns the system properties defined as command-line options.
+     * 返回定义在命令行选项的JVM系统参数
      */
     Map<String, String> getRequestedSystemProperties();
 }

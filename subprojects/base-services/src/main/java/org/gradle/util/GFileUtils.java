@@ -54,6 +54,7 @@ public class GFileUtils {
     /**
      * Ensures that the given file (or directory) is marked as modified. If the file
      * (or directory) does not exist, a new file is created.
+     * 确保给定的文件或者目录被标记为修改,文件(或者目录)不存在会创建
      */
     public static void touch(File file) {
         try {
@@ -68,6 +69,7 @@ public class GFileUtils {
     /**
      * Ensures that the given file (or directory) is marked as modified. The file
      * (or directory) must exist.
+     * 确保给定的文件或者目录被标记为修改,文件(或者目录)必须存在
      */
     public static void touchExisting(File file) {
         try {

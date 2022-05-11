@@ -24,6 +24,7 @@ public interface UsedGradleVersions {
 
     /**
      * Returns the set of Gradle versions known to be used.
+     * 返回使用过的已知gradle集合
      */
     SortedSet<GradleVersion> getUsedGradleVersions();
 

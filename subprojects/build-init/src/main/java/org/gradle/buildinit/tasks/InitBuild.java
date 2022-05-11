@@ -46,6 +46,9 @@ import static org.gradle.buildinit.plugins.internal.PackageNameBuilder.toPackage
 
 /**
  * Generates a Gradle project structure.
+ * 生成gradle项目结构
+ * lxy:gradle init
+ *
  */
 public class InitBuild extends DefaultTask {
     private final Directory projectDir = getProject().getLayout().getProjectDirectory();

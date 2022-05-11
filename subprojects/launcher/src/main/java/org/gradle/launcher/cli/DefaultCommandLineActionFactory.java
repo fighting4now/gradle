@@ -214,6 +214,7 @@ public class DefaultCommandLineActionFactory implements CommandLineActionFactory
 
             try {
                 ParsedCommandLine parsedCommandLine = parser.parse(args);
+                // lxy: 解析命令行参数的jvm系统参数
                 InitialProperties initialProperties = propertiesConverter.convert(parsedCommandLine);
 
                 // Calculate build layout, for loading properties and other logging configuration

@@ -40,6 +40,7 @@ public class BuildInitPlugin implements Plugin<Project> {
     public void apply(Project project) {
         if (project.getParent() == null) {
             project.getTasks().register("init", InitBuild.class, initBuild -> {
+                // lxy: gradle tasks  会根据group分组显示tasks描述内容
 
                 initBuild.setGroup("Build Setup");
                 initBuild.setDescription("Initializes a new Gradle build.");
