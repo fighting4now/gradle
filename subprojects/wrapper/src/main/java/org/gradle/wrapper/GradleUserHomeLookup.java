@@ -19,11 +19,20 @@ package org.gradle.wrapper;
 import java.io.File;
 
 public class GradleUserHomeLookup {
+    // 默认gradle的家目录为 用户目录/.gradle   ~/.gradle
     public static final String DEFAULT_GRADLE_USER_HOME = System.getProperty("user.home") + "/.gradle";
     public static final String GRADLE_USER_HOME_PROPERTY_KEY = "gradle.user.home";
     public static final String GRADLE_USER_HOME_ENV_KEY = "GRADLE_USER_HOME";
 
+    /**
+     * 获取gradle的家目录
+     * @return
+     */
     public static File gradleUserHome() {
+        // 先从JVM环境变量中找gradle.user.home,找到就返回    启动JVM时,可以通过 -D 设置JVM 环境变量值
+        // 没有找到再从系统环境变量中找GRADLE_USER_HOME(区分大小写),同样找到就返回
+        // 如果还没有找到就用默认值 ~/.gradle
+
         String gradleUserHome;
         if ((gradleUserHome = System.getProperty(GRADLE_USER_HOME_PROPERTY_KEY)) != null) {
             return new File(gradleUserHome);

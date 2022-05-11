@@ -32,7 +32,7 @@ public class WrapperExecutor {
     public static final String ZIP_STORE_PATH_PROPERTY = "zipStorePath";
     private final Properties properties;
     private final File propertiesFile;
-    private final WrapperConfiguration config = new WrapperConfiguration();
+    private final org.gradle.wrapper.WrapperConfiguration config = new org.gradle.wrapper.WrapperConfiguration();
 
     public static WrapperExecutor forProjectDirectory(File projectDir) {
         return new WrapperExecutor(new File(projectDir, "gradle/wrapper/gradle-wrapper.properties"), new Properties());
@@ -99,11 +99,13 @@ public class WrapperExecutor {
     /**
      * Returns the configuration for this wrapper.
      */
-    public WrapperConfiguration getConfiguration() {
+    public org.gradle.wrapper.WrapperConfiguration getConfiguration() {
         return config;
     }
 
-    public void execute(String[] args, Install install, BootstrapMainStarter bootstrapMainStarter) throws Exception {
+    public void execute(String[] args, org.gradle.wrapper.Install install, org.gradle.wrapper.BootstrapMainStarter bootstrapMainStarter) throws Exception {
+        // 返回: /home/lxy/.gradle/wrapper/dists/gradle-7.0-rc-2-bin/e1jqremdh98wksqnd1czv86wy/gradle-7.0-rc-2
+        // 新的gradleHome
         File gradleHome = install.createDist(config);
         bootstrapMainStarter.start(args, gradleHome);
     }

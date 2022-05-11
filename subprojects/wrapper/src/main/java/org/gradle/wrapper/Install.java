@@ -26,41 +26,47 @@ import java.security.MessageDigest;
 
 public class Install {
     public static final String DEFAULT_DISTRIBUTION_PATH = "wrapper/dists";
-    private final Logger logger;
-    private final IDownload download;
-    private final PathAssembler pathAssembler;
-    private final ExclusiveFileAccessManager exclusiveFileAccessManager = new ExclusiveFileAccessManager(120000, 200);
+    private final org.gradle.wrapper.IDownload download;
+    private final org.gradle.wrapper.PathAssembler pathAssembler;
+    private final org.gradle.wrapper.ExclusiveFileAccessManager exclusiveFileAccessManager = new org.gradle.wrapper.ExclusiveFileAccessManager(120000, 200);
 
-    public Install(Logger logger, IDownload download, PathAssembler pathAssembler) {
+    public Install(Logger logger, org.gradle.wrapper.IDownload download, org.gradle.wrapper.PathAssembler pathAssembler) {
         this.logger = logger;
         this.download = download;
         this.pathAssembler = pathAssembler;
     }
 
-    public File createDist(final WrapperConfiguration configuration) throws Exception {
+    public File createDist(final org.gradle.wrapper.WrapperConfiguration configuration) throws Exception {
+        // 获取gradle-wrapper.properties中的属性distributionUrl值 例如:https\://services.gradle.org/distributions/gradle-7.0-rc-2-bin.zip
+        //
         final URI distributionUrl = configuration.getDistribution();
         final String distributionSha256Sum = configuration.getDistributionSha256Sum();
 
-        final PathAssembler.LocalDistribution localDistribution = pathAssembler.getDistribution(configuration);
+        final org.gradle.wrapper.PathAssembler.LocalDistribution localDistribution = pathAssembler.getDistribution(configuration);
+        // /home/lxy/.gradle/wrapper/dists/gradle-7.0-rc-2-bin/e1jqremdh98wksqnd1czv86wy/
         final File distDir = localDistribution.getDistributionDir();
+        // $GRADLE_USER_HOME/wrapper/dists/gradle-7.0-rc-2-bin/e1jqremdh98wksqnd1czv86wy/gradle-7.0-rc-2-bin.zip
         final File localZipFile = localDistribution.getZipFile();
 
         return exclusiveFileAccessManager.access(localZipFile, new Callable<File>() {
             public File call() throws Exception {
+                //  判断是否存在这个文件/home/lxy/.gradle/wrapper/dists/gradle-7.0-rc-2-bin/e1jqremdh98wksqnd1czv86wy/gradle-7.0-rc-2-bin.zip.ok
                 final File markerFile = new File(localZipFile.getParentFile(), localZipFile.getName() + ".ok");
                 if (distDir.isDirectory() && markerFile.isFile()) {
                     InstallCheck installCheck = verifyDistributionRoot(distDir, distDir.getAbsolutePath());
+                    // 如果安全检查通过,则返回 gradleHome 不用下载或者解压
                     if (installCheck.isVerified()) {
+                        // 返回: /home/lxy/.gradle/wrapper/dists/gradle-7.0-rc-2-bin/e1jqremdh98wksqnd1czv86wy/gradle-7.0-rc-2
                         return installCheck.gradleHome;
                     }
                     // Distribution is invalid. Try to reinstall.
                     System.err.println(installCheck.failureMessage);
                     markerFile.delete();
                 }
-
+                // 如果下载的zip文件是否为一个文件
                 boolean needsDownload = !localZipFile.isFile();
-                URI safeDistributionUrl = Download.safeUri(distributionUrl);
-
+                URI safeDistributionUrl = org.gradle.wrapper.Download.safeUri(distributionUrl);
+                // 如果下载的zip文件不存在,就需要下载
                 if (needsDownload) {
                     File tmpZipFile = new File(localZipFile.getParentFile(), localZipFile.getName() + ".part");
                     tmpZipFile.delete();
@@ -78,6 +84,7 @@ public class Install {
                 verifyDownloadChecksum(configuration.getDistribution().toString(), localZipFile, distributionSha256Sum);
 
                 try {
+                    // 解压zip文件
                     unzip(localZipFile, distDir);
                 } catch (IOException e) {
                     logger.log("Could not unzip " + localZipFile.getAbsolutePath() + " to " + distDir.getAbsolutePath() + ".");
@@ -130,6 +137,7 @@ public class Install {
 
     private InstallCheck verifyDistributionRoot(File distDir, String distributionDescription)
         throws Exception {
+        // 返回: /home/lxy/.gradle/wrapper/dists/gradle-7.0-rc-2-bin/e1jqremdh98wksqnd1czv86wy/gradle-7.0-rc-2
         List<File> dirs = listDirs(distDir);
         if (dirs.isEmpty()) {
             return InstallCheck.failure(String.format("Gradle distribution '%s' does not contain any directories. Expected to find exactly 1 directory.", distributionDescription));
@@ -137,9 +145,10 @@ public class Install {
         if (dirs.size() != 1) {
             return InstallCheck.failure(String.format("Gradle distribution '%s' contains too many directories. Expected to find exactly 1 directory.", distributionDescription));
         }
-
+        // 只返回: /home/lxy/.gradle/wrapper/dists/gradle-7.0-rc-2-bin/e1jqremdh98wksqnd1czv86wy/gradle-7.0-rc-2
         File gradleHome = dirs.get(0);
-        if (BootstrapMainStarter.findLauncherJar(gradleHome) == null) {
+        // 判断之前解压的gradle-7.0-rc-2目录下是否有lib/gradle-launcher-.*\.jar文件
+        if (org.gradle.wrapper.BootstrapMainStarter.findLauncherJar(gradleHome) == null) {
             return InstallCheck.failure(String.format("Gradle distribution '%s' does not appear to contain a Gradle distribution.", distributionDescription));
         }
         return InstallCheck.success(gradleHome);

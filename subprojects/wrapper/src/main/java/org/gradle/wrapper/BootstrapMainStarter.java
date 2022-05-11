@@ -38,6 +38,11 @@ public class BootstrapMainStarter {
         }
     }
 
+    /**
+     * 找到$GRADLE_USER_HOME/lib/下的Launcher文件  例如: $GRADLE_USER_HOME/lib/gradle-launcher-7.4.2.jar
+     * @param gradleHome
+     * @return
+     */
     static File findLauncherJar(File gradleHome) {
         File libDirectory = new File(gradleHome, "lib");
         if (libDirectory.exists() && libDirectory.isDirectory()) {

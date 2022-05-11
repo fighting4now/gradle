@@ -36,17 +36,23 @@ public class PathAssembler {
     /**
      * Determines the local locations for the distribution to use given the supplied configuration.
      */
-    public LocalDistribution getDistribution(WrapperConfiguration configuration) {
+    public LocalDistribution getDistribution(org.gradle.wrapper.WrapperConfiguration configuration) {
+        // https\://services.gradle.org/distributions/gradle-7.0-rc-2-bin.zip
+        // 返回gradle-7.0-rc-2-bin.zip
         String baseName = getDistName(configuration.getDistribution());
+        // 删除后缀名称  返回gradle-7.0-rc-2-bin
         String distName = removeExtension(baseName);
+        // 路径加上hash目录   gradle-7.0-rc-2-bin/e1jqremdh98wksqnd1czv86wy
         String rootDirName = rootDirName(distName, configuration);
+        // $GRADLE_USER_HOME/wrapper/dists/gradle-7.0-rc-2-bin/e1jqremdh98wksqnd1czv86wy
         File distDir = new File(getBaseDir(configuration.getDistributionBase()), configuration.getDistributionPath() + "/" + rootDirName);
+        // $GRADLE_USER_HOME/wrapper/dists/gradle-7.0-rc-2-bin/e1jqremdh98wksqnd1czv86wy/gradle-7.0-rc-2-bin.zip
         File distZip = new File(getBaseDir(configuration.getZipBase()), configuration.getZipPath() + "/" + rootDirName + "/" + baseName);
         return new LocalDistribution(distDir, distZip);
     }
 
-    private String rootDirName(String distName, WrapperConfiguration configuration) {
-        String urlHash = getHash(Download.safeUri(configuration.getDistribution()).toString());
+    private String rootDirName(String distName, org.gradle.wrapper.WrapperConfiguration configuration) {
+        String urlHash = getHash(org.gradle.wrapper.Download.safeUri(configuration.getDistribution()).toString());
         return distName + "/" + urlHash;
     }
 

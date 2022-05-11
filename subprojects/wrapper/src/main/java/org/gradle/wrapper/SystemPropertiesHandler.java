@@ -25,6 +25,11 @@ import java.util.Properties;
 public class SystemPropertiesHandler {
     static final String SYSTEM_PROP_PREFIX = "systemProp.";
 
+    /**
+     * 从指定文件获取自定义JVM系统属性  以systemProp. 开头的属性
+     * @param propertiesFile
+     * @return
+     */
     public static Map<String, String> getSystemProperties(File propertiesFile) {
         Map<String, String> propertyMap = new HashMap<String, String>();
         if (!propertiesFile.isFile()) {
